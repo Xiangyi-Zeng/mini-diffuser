@@ -1,0 +1,87 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Cursor Project Rules – Mini-Diffuser
+
+## 1. Project Scope & Tech Stack
+1.1 The goal is a laptop-friendly demo that:
+   • Consumes text prompts from Kafka (single-node KRaft).
+   • Cleans/enriches them with Spark Structured Streaming (local[4]).
+   • Runs an INT8 Stable-Diffusion ONNX model on CPU inside a Spring-Boot (WebFlux) app.
+   • Caches generated images in Redis and serves them via REST.
+1.2 Out-of-scope: dedicated GPUs, multi-node Spark, production hardening.
+
+## 2. Repository Layout (Maven multi-module)
+```
+common/              # shared DTOs & utils
+spark-job/           # Spark Structured Streaming
+inference-api/       # Spring Boot WebFlux + ONNX Runtime
+docker-compose.yml   # Kafka, Redis, Prometheus
+README.md
+```
+
+## 3. Incremental Road-map (follow in order)
+Phase 0  Scaffold modules & Docker Compose (Kafka + Redis).
+Phase 1  Spark job reads `prompts.raw` → `prompts.clean` (no inference).
+Phase 2  Spring app consumes `prompts.clean`, logs prompt (stub).
+Phase 3  Integrate ONNX Runtime, generate placeholder images.
+Phase 4  Replace placeholder with real INT8 SD model, add Redis cache.
+Phase 5  Expose `GET /image/{hash}`, add basic Prometheus metrics.
+Phase 6  (Stretch) minikube Helm charts & simple Vue/React viewer.
+
+## 4. Code Quality & Style
+• Java 17, Maven 3.9.
+• Package by feature (`dev.minidiff.inference`, `...spark`).
+• camelCase variables & methods; PascalCase classes.
+• Javadoc on public classes; inline comments only for non-obvious logic.
+• SLF4J + Logback (INFO default, DEBUG via env flag).
+• No magic numbers; expose tunables via `application.yml`.
+
+## 5. Concurrency & Back-Pressure
+• Inference service uses a fixed-size `ExecutorService` (configurable, default = 2).
+• If queue length > N prompts, log WARN and drop or delay (config flag).
+• Never block Netty event-loop threads; use Reactor `publishOn()` correctly.
+
+## 6. Testing Rules
+• JUnit 5 + Testcontainers for Kafka & Redis.
+• Spark job: end-to-end test with local `SparkSession`.
+• Aim ≥ 70 % branch coverage on critical utils; skip heavy ONNX loops.
+## 7. Cursor Tool Usage
+7.1 Use `grep_search` for exact symbol look-ups, `codebase_search` for conceptual queries.
+7.2 Batch file reads/searches with parallel tool calls whenever possible.
+7.3 Apply edits via `edit_file`; never dump full files in chat.
+7.4 After edits, run `mvn test` (via terminal_cmd) before starting next feature.
+
+## 8. Containerisation & Dev Ops
+• `docker-compose up` is the canonical dev path (Kafka, Redis, Prometheus).
+• Build images with Jib (`mvn compile jib:dockerBuild`).
+• Prometheus scrapes `/actuator/prometheus` from Spring app.
+
+## 9. Observability & Metrics
+Expose via Micrometer:
+• prompt-ingest rate
+• inference latency
+• queue depth
+• cache-hit ratio
+Log image generation time per request at INFO.
+
+## 10. Documentation & DX
+• README includes prerequisites, `docker-compose up`, sample `kcat` producer cmd, `curl` to fetch image.
+• Update docs whenever dev steps change; outdated docs are bugs.
+
+## 11. Commit & PR Etiquette
+• Atomic commits per feature/bug.
+• Message template: `<module>: <short change> (#issue-id)`.
+• Self-review PRs with checklist (tests, docs, lint pass).
+
+## 12. Stretch-Goal Guardrails
+• Begin stretch items only after Phase 5 is stable locally.
+• GPU experiments live in branch `feature/gpu-test`.
+• K8s manifests reside under `deploy/helm`.
+
+---
+
+**Rule Override Policy:**
+Follow these rules unless the user explicitly overrides them. If a conflict arises, ask which rule to relax.
